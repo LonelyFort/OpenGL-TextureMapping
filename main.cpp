@@ -152,18 +152,39 @@ void MakeReflectionImage( void )
     // STEP 6: Read the correct color buffer into the correct texture object.
     //********************************************************
 
+    //Clear Buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    //set virtual viewpt
     double virtualViewPt[4] = { eyePos[0], eyePos[1], TABLETOP_Z - eyePos[2] };
     
+    //set projection (testing orthogonal projection)
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glOrtho(TABLETOP_X1, TABLETOP_X2, TABLETOP_Y1, TABLETOP_Y2, TABLETOP_Z, TABLETOP_Z + ROOM_HEIGHT);
+    //glFrustum(TABLETOP_Y1 - virtualViewPt[1], TABLETOP_Y2 - virtualViewPt[1],
+    //    TABLETOP_X1 - virtualViewPt[0], TABLETOP_X2 - virtualViewPt[0],
+    //    TABLETOP_Z - virtualViewPt[2], TABLETOP_Z - virtualViewPt[2] + SCENE_RADIUS);
 
+    //set camera view
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(virtualViewPt[0], virtualViewPt[1], virtualViewPt[2],
-              virtualViewPt[0], )
+                eyePos[0], eyePos[1], eyePos[2],
+                1, 0, 0);
+
+    //set lighting
+    glLightfv(GL_LIGHT0, GL_POSITION, light0Position);
+    glLightfv(GL_LIGHT1, GL_POSITION, light1Position);
+
+    //draw models (to add own model)
+    DrawRoom();
+    DrawTeapot();
+    DrawSphere();
+
+    glReadBuffer(GL_BACK);
+    glBindTexture(GL_TEXTURE_2D, reflectionTexObj);
+    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, winWidth, winHeight, 0);
 
 }
 
