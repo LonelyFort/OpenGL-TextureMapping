@@ -554,11 +554,12 @@ void SetUpTextureMaps( void )
     // all other lower-resolution mipmap levels are automatically generated.
     //********************************************************
 
-    //****************************
-    // WRITE YOUR CODE HERE.
-    //****************************
-
-
+    glGenTextures(1, &reflectionTexObj);
+    glBindTexture(GL_TEXTURE_2D, reflectionTexObj);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
 }
 
 
@@ -933,10 +934,14 @@ void DrawTable( void )
     // and the underlying diffuse color and lighting on the tabletop must still be visible.
     //********************************************************
 
-    //****************************
-    // WRITE YOUR CODE HERE.
-    //****************************
+    //glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glBindTexture(GL_TEXTURE_2D, reflectionTexObj);
 
+    glNormal3f(0.0, 0.0, 1.0); // Normal vector.
+    SubdivideAndDrawQuad(24, 24, 0.0, 0.0, TABLETOP_X1, TABLETOP_Y1, TABLETOP_Z,
+                                0.0, 1.0, TABLETOP_X1, TABLETOP_Y2, TABLETOP_Z,
+                                1.0, 1.0, TABLETOP_X2, TABLETOP_Y2, TABLETOP_Z,
+                                1.0, 0.0, TABLETOP_X2, TABLETOP_Y1, TABLETOP_Z);
 
 
 
