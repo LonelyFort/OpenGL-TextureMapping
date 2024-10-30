@@ -1,13 +1,21 @@
 //============================================================
 // STUDENT NAME: Liu Yu-Wei
 // NUS User ID.: A0272975M
-// COMMENTS TO GRADER:
+// COMMENTS TO GRADER: 
+// Parser class taken from Wu LeZheng
+// Porsche 911 GT2 model by storque12 on "free3d.com"
+// Car Paint Image from Adobe
 //
 // ============================================================
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <vector>
+#include <fstream>
+#include <string>
+#include <array>
+//
 #include "image_io.h"
 
 #ifdef __APPLE__
@@ -80,6 +88,7 @@ const char ceilingTexFile[] = "images/ceiling.jpg";
 const char brickTexFile[] = "images/brick.jpg";
 const char checkerTexFile[] = "images/checker.png";
 const char spotsTexFile[] = "images/spots.png";
+const char porscheTexFile[] = "images/carpaint.jpg";
 
 
 
@@ -113,6 +122,7 @@ GLuint ceilingTexObj;
 GLuint brickTexObj;
 GLuint checkerTexObj;
 GLuint spotsTexObj;
+GLuint porscheTexobj;
 
 // Others.
 bool drawAxes = true;           // Draw world coordinate frame axes iff true.
@@ -126,8 +136,154 @@ void DrawRoom( void );
 void DrawTeapot( void );
 void DrawSphere( void );
 void DrawTable( void );
+void DrawPorsche(void);
 
+// Parser class
+// This parser class converts Wavefront .obj file and draws 3D models into Opengl
+// Taken from Wu LeZheng
+class Model {
+private:
+    class Face {
+    public:
+        int edge;
+        int* vertices;
+        int* texCoords;
+        int normal;
 
+        Face(int edge, int* vertices, int* texCoords, int normal = -1) {
+            this->edge = edge;
+            this->vertices = vertices;
+            this->texCoords = texCoords;
+            this->normal = normal;
+        }
+    };
+
+    std::vector<float*> vertices;
+    std::vector<float*> texCoords;
+    std::vector<float*> normals;
+    std::vector<Face> faces;
+    GLuint list;
+
+    static int count_char(std::string& str, char ch) {
+        int c = 0;
+        int length = str.length() - 1;
+        for (int i = 0; i < length; i++) {
+            if (str[i] == ch)
+                c++;
+        }
+        return c;
+    }
+
+    // Add a face with 3 vertices
+    void add_face_3vtn(std::string& line) {
+        int v0, v1, v2, t0, t1, t2, n;
+        sscanf(line.c_str(), "f %d/%d/%d %d/%d/%d %d/%d/%d", &v0, &t0, &n, &v1, &t1, &n, &v2, &t2, &n);
+        int* v = new int[3] {v0 - 1, v1 - 1, v2 - 1};
+        int* t = new int[3] {t0 - 1, t1 - 1, t2 - 1};
+        faces.push_back(Face(3, v, t, n - 1));
+    }
+
+    // Add a face with 4 vertices
+    void add_face_4vtn(std::string& line) {
+        int v0, v1, v2, v3, t0, t1, t2, t3, n;
+        sscanf(line.c_str(), "f %d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d", &v0, &t0, &n, &v1, &t1, &n, &v2, &t2, &n, &v3,
+            &t3, &n);
+        int* v = new int[4] {v0 - 1, v1 - 1, v2 - 1, v3 - 1};
+        int* t = new int[4] {t0 - 1, t1 - 1, t2 - 1, t3 - 1};
+        faces.push_back(Face(4, v, t, n - 1));
+    }
+
+public:
+    void load(const char* fileName) {
+        std::string line;
+        std::vector<std::string> lines;
+
+        std::ifstream in(fileName);
+        if (!in.is_open()) {
+            printf("Cannot load material %s\n", fileName);
+            return;
+        }
+
+        while (!in.eof()) {
+            std::getline(in, line);
+            lines.push_back(line);
+        }
+        in.close();
+
+        // Store information about the model
+        float a, b, c;
+        for (std::string& line : lines) {
+            if (line[0] == 'v') {
+                if (line[1] == ' ') {
+                    sscanf(line.c_str(), "v %f %f %f", &a, &b, &c);
+                    vertices.push_back(new float[3] {a, b, c});
+                }
+                else if (line[1] == 't') {
+                    sscanf(line.c_str(), "vt %f %f", &a, &b);
+                    texCoords.push_back(new float[2] {a, b});
+                }
+                else {
+                    sscanf(line.c_str(), "vn %f %f %f", &a, &b, &c);
+                    normals.push_back(new float[3] {a, b, c});
+                }
+            }
+            else if (line[0] == 'f') {
+                int edge = count_char(line, ' ');
+                if (edge == 3) {
+                    add_face_3vtn(line);
+                }
+                else {
+                    add_face_4vtn(line);
+                }
+            }
+        }
+
+        // Draw the model
+        list = glGenLists(1);
+        glNewList(list, GL_COMPILE);
+        for (Face face : faces) {
+            if (face.normal != -1) {
+                glNormal3fv(normals[face.normal]);
+            }
+            else {
+                glDisable(GL_LIGHTING);
+            }
+            glBegin(GL_POLYGON);
+            for (int i = 0; i < face.edge; i++) {
+                glTexCoord2fv(texCoords[face.texCoords[i]]);
+                glVertex3fv(vertices[face.vertices[i]]);
+            }
+            glEnd();
+            if (face.normal == -1) {
+                glEnable(GL_LIGHTING);
+            }
+        }
+
+        glEndList();
+
+        // Clear memory
+        for (float* f : vertices) {
+            delete f;
+        }
+        vertices.clear();
+        for (float* f : texCoords) {
+            delete f;
+        }
+        texCoords.clear();
+        for (float* f : normals) {
+            delete f;
+        }
+        normals.clear();
+        faces.clear();
+
+    }
+
+    void draw() {
+        glCallList(list);
+    }
+};
+
+Model model;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -155,21 +311,20 @@ void MakeReflectionImage( void )
     //Clear Buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    //set virtual viewpt
-    double virtualViewPt[4] = { eyePos[0], eyePos[1], TABLETOP_Z - eyePos[2] };
+    //set imaginary viewpt
+    double imagViewPt[3] = { eyePos[0], eyePos[1], 2 * TABLETOP_Z - eyePos[2] };
     
-    //set projection (testing orthogonal projection)
+    //set projection 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(TABLETOP_X1, TABLETOP_X2, TABLETOP_Y1, TABLETOP_Y2, TABLETOP_Z, TABLETOP_Z + ROOM_HEIGHT);
-    //glFrustum(TABLETOP_Y1 - virtualViewPt[1], TABLETOP_Y2 - virtualViewPt[1],
-    //    TABLETOP_X1 - virtualViewPt[0], TABLETOP_X2 - virtualViewPt[0],
-    //    TABLETOP_Z - virtualViewPt[2], TABLETOP_Z - virtualViewPt[2] + SCENE_RADIUS);
+    glFrustum(TABLETOP_Y1 - imagViewPt[1], TABLETOP_Y2 - imagViewPt[1],
+    TABLETOP_X1 - imagViewPt[0], TABLETOP_X2 - imagViewPt[0],
+    TABLETOP_Z - imagViewPt[2], TABLETOP_Z - imagViewPt[2] + SCENE_RADIUS);
 
     //set camera view
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    gluLookAt(virtualViewPt[0], virtualViewPt[1], virtualViewPt[2],
+    gluLookAt(imagViewPt[0], imagViewPt[1], imagViewPt[2],
                 eyePos[0], eyePos[1], eyePos[2],
                 1, 0, 0);
 
@@ -177,10 +332,11 @@ void MakeReflectionImage( void )
     glLightfv(GL_LIGHT0, GL_POSITION, light0Position);
     glLightfv(GL_LIGHT1, GL_POSITION, light1Position);
 
-    //draw models (to add own model)
+    //draw models
     DrawRoom();
     DrawTeapot();
     DrawSphere();
+    DrawPorsche(); 
 
     glReadBuffer(GL_BACK);
     glBindTexture(GL_TEXTURE_2D, reflectionTexObj);
@@ -232,6 +388,7 @@ void MyDisplay( void )
     DrawTeapot();
     DrawSphere();
     DrawTable();
+    DrawPorsche();
 
     glutSwapBuffers();
 }
@@ -411,6 +568,9 @@ void GLInit( void )
     // Let OpenGL automatically renomarlize all normal vectors.
     // This is important if objects are to be scaled.
     glEnable( GL_NORMALIZE );
+
+    //parser class requires load method to be used in GLUinit
+    model.load("images/porsche.obj");
 }
 
 
@@ -559,7 +719,32 @@ void SetUpTextureMaps( void )
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
+
+
+// Car Paint Texture Map
+
+
+    glGenTextures(1, &porscheTexobj);
+    glBindTexture(GL_TEXTURE_2D, porscheTexobj);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+    if (ReadImageFile(porscheTexFile, &imageData,
+        &imageWidth, &imageHeight, &numComponents) == 0) exit(1);
+    if (numComponents != 3)
+    {
+        fprintf(stderr, "Error: Texture image is not in RGB format.\n");
+        exit(1);
+    }
+
+    gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, imageWidth, imageHeight,
+        GL_RGB, GL_UNSIGNED_BYTE, imageData);
+
+    DeallocateImageData(&imageData);
 }
 
 
@@ -934,14 +1119,14 @@ void DrawTable( void )
     // and the underlying diffuse color and lighting on the tabletop must still be visible.
     //********************************************************
 
-    //glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     glBindTexture(GL_TEXTURE_2D, reflectionTexObj);
 
     glNormal3f(0.0, 0.0, 1.0); // Normal vector.
     SubdivideAndDrawQuad(24, 24, 0.0, 0.0, TABLETOP_X1, TABLETOP_Y1, TABLETOP_Z,
-                                0.0, 1.0, TABLETOP_X1, TABLETOP_Y2, TABLETOP_Z,
+                                0.0, 1.0, TABLETOP_X2, TABLETOP_Y1, TABLETOP_Z,
                                 1.0, 1.0, TABLETOP_X2, TABLETOP_Y2, TABLETOP_Z,
-                                1.0, 0.0, TABLETOP_X2, TABLETOP_Y1, TABLETOP_Z);
+                                1.0, 0.0, TABLETOP_X1, TABLETOP_Y2, TABLETOP_Z);
 
 
 
@@ -1028,5 +1213,26 @@ void DrawTable( void )
     glScaled( TABLE_THICKNESS, TABLE_THICKNESS, TABLETOP_Z - TABLE_THICKNESS );
     glTranslated( 0.0, 0.0, 0.5 );
     glutSolidCube( 1.0 );
+    glPopMatrix();
+}
+
+//Using parser class
+void DrawPorsche( void ) {
+    GLfloat matAmbient[] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat matDiffuse[] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat matSpecular[] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat matShininess[] = { 32 };
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, matAmbient);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, matDiffuse);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, matSpecular);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, matShininess);
+
+    glBindTexture(GL_TEXTURE_2D, porscheTexobj);
+
+    glPushMatrix();
+    glTranslated((TABLETOP_X2 - TABLETOP_X1) / 4, -(TABLETOP_Y2 - TABLETOP_Y1) / 4, TABLETOP_Z + 0.2);
+    glRotated(90, 1, 0, 0);
+    glScaled(0.3, 0.3, 0.3);
+    model.draw();
     glPopMatrix();
 }
