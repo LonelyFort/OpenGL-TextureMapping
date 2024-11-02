@@ -1,6 +1,6 @@
 //============================================================
 // STUDENT NAME: Liu Yu-Wei
-// NUS User ID.: A0272975M
+// NUS User ID.: E1122378
 // COMMENTS TO GRADER: 
 // Parser class taken from Wu LeZheng
 // Porsche 911 GT2 model by storque12 on "free3d.com"
